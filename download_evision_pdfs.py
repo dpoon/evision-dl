@@ -36,13 +36,16 @@ from selenium.common.exceptions import \
     ElementNotInteractableException, \
     NoSuchElementException, \
     StaleElementReferenceException, \
-    TimeoutException
+    TimeoutException, \
+    WebDriverException, \
+    NoSuchWindowException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 # Include logger for debugging
 import logging
+import traceback
 logger = logging.getLogger()
 logging.basicConfig(  # Comment out logging.basicConfig when not debugging
     level=logging.INFO,
@@ -77,14 +80,17 @@ def download(dest_file, url, headers=[]):
             logger.info("download(): FINISHED DOWNLOAD")
 
 def click(driver, *expectation):
-    logger.info("click(): ATTEMPTING {} AT URL {}".format(expectation, driver.current_url))
     while True:
+        logger.info("click(): ATTEMPTING {} AT URL {}".format(expectation, driver.current_url))
         try:
             return WebDriverWait(driver, 90).until(
                 EC.presence_of_element_located(expectation)
             ).click()
-        except TimeoutException:
-            logger.error("click(): TIMEOUT EXCEPTION")
+        except (TimeoutException, WebDriverException) as e:
+            if isinstance(e, TimeoutException):
+                logger.error("click(): TIMEOUT EXCEPTION")
+            else:
+                logger.error("click(): WEB DRIVER EXCEPTION")
         except ElementClickInterceptedException:
             logger.warning("click(): CLICK INTERCEPTED")
             # Element is obscured, perhaps by an overlay
@@ -108,6 +114,7 @@ def click_button_open_window(driver, button):
     the newly opened window.
     """
     while True:
+        logger.info("click_button_open_window(): ATTEMPTING TO CLICK {} AT {}".format(button, driver.current_url))
         try:
             return WebDriverWait(driver, 10).until(window_opened(
                 lambda: button.click()
@@ -198,10 +205,10 @@ def navigate_to_first_app(driver):
 
 
 def request_pdf(driver):
-    logger.info("request_pdf(): STARTING...")
     app_window = driver.current_window_handle
     logger.info("request_pdf(): app_window = {}".format(app_window))
     while True:
+        logger.info("request_pdf(): ATTEMPTING TO GET PDF URL FROM {}".format(driver.current_url))
         try:
             click(driver, By.LINK_TEXT, "GPO")
             # Want "Application Utilities" link, but By.LINK_TEXT fails when
@@ -272,6 +279,8 @@ def request_pdf(driver):
                 (By.LINK_TEXT, "click here")
             )).get_attribute('href')
             break
+        except NoSuchWindowException:
+            logger.error("request_pdf(): NO SUCH WINDOW EXCEPTION")
         except (StaleElementReferenceException, TimeoutException) as e:
             if isinstance(e, TimeoutException):
                 logger.error("request_pdf(): TIMEOUT EXCEPTION WHILE GETTING pdf_url")
@@ -307,8 +316,8 @@ def extract_app_identity(driver):
     return surname, preferred_name, student_number
 
 def process_apps(driver, dest_dir):
-    logger.info("process_apps(): STARTING...")
     while True:
+        logger.info("process_apps(): STARTING...")
         try:
             surname, preferred_name, student_number = extract_app_identity(driver)
         except TimeoutException:
@@ -376,10 +385,12 @@ def main(*argv):
         navigate_to_first_app(driver)
         for pdf_url, dest_file in process_apps(driver, args['dest_dir']):
             save(driver, dest_file, pdf_url or '', download_pool)
-    except (KeyboardInterrupt, TimeoutException) as e:
-        if isinstance(e, TimeoutException):
-            logger.error("TIMEOUT EXCEPTION FROM navigate_to_first_app()")
+    except KeyboardInterrupt:
         pass
+    except Exception as e:
+        traceback_str = ''.join(traceback.format_tb(e.__traceback__))
+        logger.error("CAUGHT ERROR: {} \n {}".format(type(e), traceback_str))
+        raise e
     print('Finishing downloads...')
     if download_pool is not None:
         logger.info("CLEARING download_pool...")
