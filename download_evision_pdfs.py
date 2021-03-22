@@ -48,7 +48,7 @@ logger = logging.getLogger()
 logging.basicConfig(  # Comment out logging.basicConfig when not debugging
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    filename="2021-03-22_evision.log"
+    filename="2021-03-22_evision_v2.log"
 )
 # Path to the Firefox driver (geckodriver)
 os.environ['PATH'] = os.path.join(os.path.expanduser('~'), 'bin') + os.pathsep + os.environ['PATH']
@@ -109,7 +109,7 @@ def click_button_open_window(driver, button):
     the newly opened window.
     """
     while True:
-        logger.info("click_button_open_window(): ATTEMPTING TO CLICK {} AT {}".format(button, driver.current_url))
+        logger.info("click_button_open_window(): ATTEMPTING TO CLICK {}".format(button.get_attribute('outerHTML')))
         try:
             return WebDriverWait(driver, 10).until(window_opened(
                 lambda: button.click()
@@ -127,9 +127,10 @@ def click_button_open_window(driver, button):
             except ElementNotInteractableException:
                 logger.error("click_button_open_window(): AFTER SCROLLING, ELEMENT NOT INTERACTABLE EXCEPTION")
                 pass
-        except (ElementNotInteractableException) as e:
+        except (ElementNotInteractableException):
             logger.error("click_button_open_window(): ELEMENT NOT INTERACTABLE EXCEPTION")
             #print(e)
+            click(driver, By.PARTIAL_LINK_TEXT, "Utilities")
             pass
 
 class window_opened(object):
