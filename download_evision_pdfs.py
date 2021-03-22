@@ -36,9 +36,7 @@ from selenium.common.exceptions import \
     ElementNotInteractableException, \
     NoSuchElementException, \
     StaleElementReferenceException, \
-    TimeoutException, \
-    WebDriverException, \
-    NoSuchWindowException
+    TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
@@ -50,7 +48,7 @@ logger = logging.getLogger()
 logging.basicConfig(  # Comment out logging.basicConfig when not debugging
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    filename="2021-03-19_version_WebDriverException.log"
+    filename="2021-03-22_evision.log"
 )
 # Path to the Firefox driver (geckodriver)
 os.environ['PATH'] = os.path.join(os.path.expanduser('~'), 'bin') + os.pathsep + os.environ['PATH']
@@ -86,18 +84,8 @@ def click(driver, *expectation):
             return WebDriverWait(driver, 90).until(
                 EC.presence_of_element_located(expectation)
             ).click()
-        except (TimeoutException, WebDriverException, NoSuchWindowException) as e:
-            # TODO "Details": FIGURE OUT WHY WebDriverException IS RAISED
-            if isinstance(e, WebDriverException):
-                logger.error("click(): WEB DRIVER EXCEPTION")
-                traceback_str = ''.join(traceback.format_tb(e.__traceback__))
-                logger.info("click(): DETAILS: {} \n {}".format(repr(e), traceback_str))
-                if e == ('partial link text', 'Details'):
-                    raise e
-            elif isinstance(e, NoSuchWindowException):
-                logger.error("click(): NO SUCH WINDOW EXCEPTION")
-            else:
-                logger.error("click(): TIMEOUT EXCEPTION")
+        except TimeoutException:
+            logger.error("click(): TIMEOUT EXCEPTION")
         except ElementClickInterceptedException:
             logger.warning("click(): CLICK INTERCEPTED")
             # Element is obscured, perhaps by an overlay
@@ -276,21 +264,19 @@ def request_pdf(driver):
             #        "There has been a processing error" in div.text
             #
             #        for div in driver.find_elements(By.TAG_NAME, 'div')):
-            # TODO: EXCEPTION INITIALIZING FOR LOOP SOMETIMES AFTER CATCHING TIMEOUT EXCEPTION
             for div in driver.find_elements(By.TAG_NAME, 'div'):
                 if "Please to download" in div.text or "There has been a processing error" in div.text:
                     pdf_url = None
                     logger.warning("request_pdf(): PROCESSING ERROR AT ELEMENT {}".format(div))
-                else:
-                    logger.info("request_pdf(): LOCATING PDF URL FROM HREF...")
-                    pdf_url = WebDriverWait(driver, 1).until(EC.presence_of_element_located(
-                        (By.LINK_TEXT, "click here")
-                    )).get_attribute('href')
-        except (StaleElementReferenceException, TimeoutException, NoSuchWindowException) as e:
+                    break
+            logger.info("request_pdf(): LOCATING PDF URL FROM HREF...")
+            pdf_url = WebDriverWait(driver, 1).until(EC.presence_of_element_located(
+                (By.LINK_TEXT, "click here")
+            )).get_attribute('href')
+            break
+        except (StaleElementReferenceException, TimeoutException) as e:
             if isinstance(e, TimeoutException):
                 logger.error("request_pdf(): TIMEOUT EXCEPTION WHILE GETTING pdf_url")
-            elif isinstance(e, NoSuchWindowException):
-                logger.error("request_pdf(): NO SUCH WINDOW EXCEPTION")
             else:
                 logger.error("request_pdf(): STALE ELEMENT REFERENCE EXCEPTION WHILE GETTING pdf_url")
             pass        # Try again
@@ -312,7 +298,6 @@ def extract_app_identity(driver):
                     .format(td, td_formatted))
         return td_formatted
     # Want "Application Details" link, but By.LINK_TEXT fails when there is a space
-    # TODO: GETS STUCK WHEN TRYING TO CLICK "Details"
     click(driver, By.PARTIAL_LINK_TEXT, "Details")
     # Want "Personal Details" link, but By.LINK_TEXT fails when there is a space
     click(driver, By.PARTIAL_LINK_TEXT, "Personal")
@@ -394,6 +379,7 @@ def main(*argv):
         for pdf_url, dest_file in process_apps(driver, args['dest_dir']):
             save(driver, dest_file, pdf_url or '', download_pool)
     except KeyboardInterrupt:
+        logger.info("KEYBOARD INTERRUPT")
         pass
     except Exception as e:
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
