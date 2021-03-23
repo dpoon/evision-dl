@@ -48,7 +48,7 @@ logger = logging.getLogger()
 logging.basicConfig(  # Comment out logging.basicConfig when not debugging
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    filename="2021-03-22_evision_v2.log"
+    filename="2021-03-23_evision.log"
 )
 # Path to the Firefox driver (geckodriver)
 os.environ['PATH'] = os.path.join(os.path.expanduser('~'), 'bin') + os.pathsep + os.environ['PATH']
@@ -78,7 +78,7 @@ def download(dest_file, url, headers=[]):
             logger.info("download(): FINISHED DOWNLOAD")
 
 def click(driver, *expectation):
-    while True:
+    for _ in range(3):
         logger.info("click(): ATTEMPTING {} AT URL {}".format(expectation, driver.current_url))
         try:
             return WebDriverWait(driver, 90).until(
@@ -102,6 +102,8 @@ def click(driver, *expectation):
                 # Another overlay, perhaps "Loading, please wait..."
                 #print("Retrying click...")
                 pass
+    logger.warning("click(): UNABLE TO CLICK {}, RAISING ERROR".format(expectation))
+    raise NoSuchElementException
 
 def click_button_open_window(driver, button):
     """
@@ -127,11 +129,15 @@ def click_button_open_window(driver, button):
             except ElementNotInteractableException:
                 logger.error("click_button_open_window(): AFTER SCROLLING, ELEMENT NOT INTERACTABLE EXCEPTION")
                 pass
-        except (ElementNotInteractableException):
+        except ElementNotInteractableException:
             logger.error("click_button_open_window(): ELEMENT NOT INTERACTABLE EXCEPTION")
             #print(e)
-            click(driver, By.PARTIAL_LINK_TEXT, "Utilities")
             pass
+        try:
+            click(driver, By.PARTIAL_LINK_TEXT, "Utilities")
+        except NoSuchElementException:
+            logger.error("click_button_open_window(): NO SUCH ELEMENT EXCEPTION FROM click(), RETRYING")
+
 
 class window_opened(object):
     """
@@ -195,12 +201,15 @@ def navigate_to_first_app(driver):
         try:
             click(driver, By.LINK_TEXT, "GPO")
             return app_window
+        except NoSuchElementException:
+            logger.error("navigate_to_first_app(): NO SUCH ELEMENT EXCEPTION FROM click(), RETRYING")
         except TimeoutException:
             logger.error("navigate_to_first_app(): TIMEOUT WHILE TRYING TO CLICK LINK \"GPO\"")
             pass        # This wasn't the window we were looking for?
 
 
 def request_pdf(driver):
+    pdf_url = None
     app_window = driver.current_window_handle
     logger.info("request_pdf(): app_window = {}".format(app_window))
     while True:
@@ -228,8 +237,12 @@ def request_pdf(driver):
             driver.switch_to.window(pdf_window)
             logger.info("request_pdf(): SWITCHING TO WINDOW pdf_window = {}")
             break
-        except TimeoutException:
-            logger.error("request_pdf(): TIMEOUT EXCEPTION WHILE LOCATING pdf_button")
+        except (TimeoutException, NoSuchElementException) as e:
+            if isinstance(e, TimeoutException):
+                logger.error("request_pdf(): TIMEOUT EXCEPTION WHILE LOCATING pdf_button")
+            elif isinstance(e, NoSuchElementException):
+                logger.error("request_pdf(): NO SUCH ELEMENT EXCEPTION FROM click(), RETRYING")
+
         except StaleElementReferenceException:
             logger.error("request_pdf(): STALE ELEMENT REFERENCE EXCEPTION")
             pass
@@ -269,24 +282,37 @@ def request_pdf(driver):
                 if "Please to download" in div.text or "There has been a processing error" in div.text:
                     pdf_url = None
                     logger.warning("request_pdf(): PROCESSING ERROR AT ELEMENT {}".format(div))
-                    break
+                    print("An error occurred while processing the PDF, skipping file...")
+                    logger.info("request_pdf(): SKIPPING FILE")
+                    logger.info("request_pdf(): CLICKING ELEMENT LABELLED 'EXIT'")
+                    click(driver, By.XPATH, '//input[@value="EXIT"]')
+                    logger.info("request_pdf(): SWITCHING TO WINDOW {}".format(app_window))
+                    driver.switch_to.window(app_window)
+                    return pdf_url
+
             logger.info("request_pdf(): LOCATING PDF URL FROM HREF...")
             pdf_url = WebDriverWait(driver, 1).until(EC.presence_of_element_located(
                 (By.LINK_TEXT, "click here")
             )).get_attribute('href')
             break
-        except (StaleElementReferenceException, TimeoutException) as e:
+        except (StaleElementReferenceException, TimeoutException, NoSuchElementException) as e:
             if isinstance(e, TimeoutException):
                 logger.error("request_pdf(): TIMEOUT EXCEPTION WHILE GETTING pdf_url")
+            elif isinstance(e, NoSuchElementException):
+                logger.error("request_pdf(): NO SUCH ELEMENT EXCEPTION FROM click(), RETRYING")
             else:
                 logger.error("request_pdf(): STALE ELEMENT REFERENCE EXCEPTION WHILE GETTING pdf_url")
             pass        # Try again
-    logger.info("request_pdf(): CLICKING ELEMENT LABELLED 'EXIT'")
-    click(driver, By.XPATH, '//input[@value="EXIT"]')
-    logger.info("request_pdf(): SWITCHING TO WINDOW {}".format(app_window))
-    driver.switch_to.window(app_window)
-    return pdf_url
-
+    while True:
+        try:
+            logger.info("request_pdf(): CLICKING ELEMENT LABELLED 'EXIT'")
+            click(driver, By.XPATH, '//input[@value="EXIT"]')
+            logger.info("request_pdf(): SWITCHING TO WINDOW {}".format(app_window))
+            driver.switch_to.window(app_window)
+            return pdf_url
+        except NoSuchElementException:
+            logger.error("request_pdf(): NO SUCH ELEMENT EXCEPTION FROM click() ON BUTTON \"EXIT\", RETRYING")
+            pass
 
 def extract_app_identity(driver):
     logger.info("extract_app_identity(): STARTING...")
@@ -298,16 +324,21 @@ def extract_app_identity(driver):
         logger.info("extract_table_text(): FOUND {}, RETURNING FORMATTED DATA {}"
                     .format(td, td_formatted))
         return td_formatted
-    # Want "Application Details" link, but By.LINK_TEXT fails when there is a space
-    click(driver, By.PARTIAL_LINK_TEXT, "Details")
-    # Want "Personal Details" link, but By.LINK_TEXT fails when there is a space
-    click(driver, By.PARTIAL_LINK_TEXT, "Personal")
-    click(driver, By.XPATH, '//h4[text()="Applicant Personal Details"]')
-    surname = extract_table_text("Family Name(Surname):")
-    preferred_name = extract_table_text("Preferred Name:") or extract_table_text("Given Name:")
-    h3_text = driver.find_element(By.TAG_NAME, 'h3').text
-    student_number = re.findall(r"Student No: (\d{8})", h3_text)[0]
-    return surname, preferred_name, student_number
+    while True:
+        try:
+            # Want "Application Details" link, but By.LINK_TEXT fails when there is a space
+            click(driver, By.PARTIAL_LINK_TEXT, "Details")
+            # Want "Personal Details" link, but By.LINK_TEXT fails when there is a space
+            click(driver, By.PARTIAL_LINK_TEXT, "Personal")
+            click(driver, By.XPATH, '//h4[text()="Applicant Personal Details"]')
+            surname = extract_table_text("Family Name(Surname):")
+            preferred_name = extract_table_text("Preferred Name:") or extract_table_text("Given Name:")
+            h3_text = driver.find_element(By.TAG_NAME, 'h3').text
+            student_number = re.findall(r"Student No: (\d{8})", h3_text)[0]
+            return surname, preferred_name, student_number
+        except NoSuchElementException:
+            logger.error("extract_table_text(): NO SUCH ELEMENT EXCEPTION FROM click(), RETRYING")
+            pass
 
 def process_apps(driver, dest_dir):
     while True:
@@ -315,15 +346,19 @@ def process_apps(driver, dest_dir):
         try:
             surname, preferred_name, student_number = extract_app_identity(driver)
         except TimeoutException:
-            # Who knows what went wrong!  Try clicking "Previous Applicant", then
-            # "Next Applicant" and hopefully we'll get another chance.
-            logger.error("process_apps(): TIMEOUT EXCEPTION, CLICKING 'Previous' THEN 'Next'")
-            print("Web application did not behave as expected.  Clicking "
-                """"Previous Applicant", then "Next Applicant" to try again.""")
-            click(driver, By.PARTIAL_LINK_TEXT, "Previous")
-            click(driver, By.PARTIAL_LINK_TEXT, "Next")
-            logger.info("process_apps(): CLICKED 'Previous' THEN 'Next', CONTINUING...")
-            continue
+            try:
+                # Who knows what went wrong!  Try clicking "Previous Applicant", then
+                # "Next Applicant" and hopefully we'll get another chance.
+                logger.error("process_apps(): TIMEOUT EXCEPTION, CLICKING 'Previous' THEN 'Next'")
+                print("Web application did not behave as expected.  Clicking "
+    
+                    """"Previous Applicant", then "Next Applicant" to try again.""")
+                click(driver, By.PARTIAL_LINK_TEXT, "Previous")
+                click(driver, By.PARTIAL_LINK_TEXT, "Next")
+                logger.info("process_apps(): CLICKED 'Previous' THEN 'Next', CONTINUING...")
+                continue
+            except NoSuchElementException:
+                logger.error("process_apps(): NO SUCH ELEMENT EXCEPTION FROM click(), RETRYING")
         logger.info("process_apps(): surname = {}, preferred_name = {}, student_number = {}"
                     .format(surname, preferred_name, student_number))
         dest_file = os.path.join(
