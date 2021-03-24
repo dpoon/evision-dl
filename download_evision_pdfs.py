@@ -48,7 +48,7 @@ logger = logging.getLogger()
 logging.basicConfig(  # Comment out logging.basicConfig when not debugging
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    filename="2021-03-23_evision.log"
+    filename="download_evision_pdfs.log"
 )
 # Path to the Firefox driver (geckodriver)
 os.environ['PATH'] = os.path.join(os.path.expanduser('~'), 'bin') + os.pathsep + os.environ['PATH']
@@ -81,11 +81,14 @@ def click(driver, *expectation):
     for _ in range(3):
         logger.info("click(): ATTEMPTING {} AT URL {}".format(expectation, driver.current_url))
         try:
-            return WebDriverWait(driver, 90).until(
+            return WebDriverWait(driver, 30).until(
                 EC.presence_of_element_located(expectation)
             ).click()
-        except TimeoutException:
-            logger.error("click(): TIMEOUT EXCEPTION")
+        except (TimeoutException, StaleElementReferenceException) as e:
+            if isinstance(e, TimeoutException):
+                logger.error("click(): TIMEOUT EXCEPTION")
+            else:
+                logger.error("click(): STALE ELEMENT REFERENCE EXCEPTION")
         except ElementClickInterceptedException:
             logger.warning("click(): CLICK INTERCEPTED")
             # Element is obscured, perhaps by an overlay
