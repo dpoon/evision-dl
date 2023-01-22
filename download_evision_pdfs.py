@@ -39,8 +39,11 @@ from selenium.common.exceptions import \
     TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+options = Options()
+options.binary_location = r'C:\Program Files\Mozilla Firefox\firefox.exe'
 # Include logger for debugging
 import logging
 import traceback
@@ -411,7 +414,7 @@ def main(*argv):
         return 1
 
     download_pool = None #Pool(2)
-    driver = webdriver.Firefox(service_log_path=args.pop('webdriver_log'))
+    driver = webdriver.Firefox(service_log_path=args.pop('webdriver_log'), options=options)
     logger.info("DRIVER OBJECT: {}".format(driver))
     try:
         navigate_to_first_app(driver)
