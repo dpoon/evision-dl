@@ -74,7 +74,7 @@ def main(*argv):
             capabilities=capabilities,
             service=Service(log_path=args.pop('webdriver_log'))
         )
-    Robot(driver, args).run(EmptyScreen)
+    return Robot(driver, args).run(EmptyScreen)
 
 if __name__ == '__main__':
     sys.exit(main() or 0)

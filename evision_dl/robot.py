@@ -13,16 +13,18 @@ class Robot:
         self._current_applicant = None
         self.success_count = self.error_count = 0
 
-    def run(self, initial_screen):
+    def run(self, initial_screen_class):
         try:
-            screen = initial_screen(self)
+            screen = initial_screen_class(self)
             while screen:
                 screen = screen.process()
         except KeyboardInterrupt:
             logger.error("Keyboard interrupt")
+            return 2
         except Exception:
             logger.exception("Crashed with uncaught exception")
-            raise
+            self.error_count += 1
+            return 1
         finally:
             logger.info("Downloaded {} PDFs successfully and {} unsuccessfully".format(
                 self.success_count, self.error_count
