@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evision_dl"
+# Since web scraping is inherently fragile, the code must change frequently to
+# match the operation of the website.  The version number format is
+# YEAR.MONTH.COUNTER
+version = "2023.1.0"
+authors = [
+  { name="Dara Poon", email="dwpoon@mail.ubc.ca" },
+]
+description = "Automate the downloading of PDFs from eVision using Firefox"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {file = "LICENSE.txt"}
+classifiers = [
+    "Programming Language :: Python :: 3.8",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: OS Independent",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+    "Topic :: Office/Business",
+]
+dependencies = [
+    "selenium>=4.6.0",
+]
+
+[project.urls]
+homepage = "https://github.com/dpoon/evision-dl"
+repository = "https://github.com/dpoon/evision-dl"
+
+[project.scripts]
+"evision-dl" = "evision_dl.main:main"

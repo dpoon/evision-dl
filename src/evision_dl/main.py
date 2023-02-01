@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
 
-######################################################################
-# To install the necessary prerequisites:
-#     pip install --user selenium
-#
-# Selenium >= 4.6 will automatically download the necessary driver
-# to interface with Firefox.
-######################################################################
-
 """
 Launch a Firefox browser to download PDFs from eVision.
 """
