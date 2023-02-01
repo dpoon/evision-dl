@@ -53,6 +53,11 @@ class RequestPDFScreen(Screen):
                         (By.CSS_SELECTOR, '#sitspagecontent select.sv-form-control[multiple]'),
                     ),
                 ),
+                EC.presence_of_element_located((By.XPATH,
+                    '//label[@class="pdf-check"]'
+                        '/following-sibling::select[@class="sv-form-control"][@multiple]'
+                        '/following-sibling::label[@class="pdf-check"]'
+                )),
             )
         )
 
