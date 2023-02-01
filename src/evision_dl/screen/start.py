@@ -8,7 +8,7 @@ from .application_details import ApplicationDetailsScreen
 
 logger = logging.getLogger(__name__)
 
-class EmptyScreen(Screen):
+class StartScreen(Screen):
     def process(self):
         self.driver.get('https://evision.as.it.ubc.ca/')
         logger.info("Waiting for user to log into eVision, bring up folder, and open the application of interest.")

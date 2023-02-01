@@ -16,7 +16,7 @@ from selenium.webdriver.firefox.service import Service
 
 from evision_dl.logging import ColorFormatter
 from evision_dl.robot import Robot
-from evision_dl.screen.empty import EmptyScreen
+from evision_dl.screen.start import StartScreen
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ def main(*argv):
             capabilities=capabilities,
             service=Service(log_path=args.pop('webdriver_log'))
         )
-    return Robot(driver, args).run(EmptyScreen)
+    return Robot(driver, args).run(StartScreen)
 
 if __name__ == '__main__':
     sys.exit(main() or 0)
