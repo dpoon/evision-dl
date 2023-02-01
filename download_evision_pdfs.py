@@ -22,6 +22,7 @@ import warnings
 from selenium import webdriver
 from selenium.webdriver.firefox.service import Service
 
+from evision_dl.logging import ColorFormatter
 from evision_dl.robot import Robot
 from evision_dl.screen.empty import EmptyScreen
 
@@ -53,9 +54,13 @@ def main(*argv):
     if log_config := args.pop('log_config'):
         logging.config.fileConfig(log_config)
     else:
+        ch = logging.StreamHandler()
+        ch.setFormatter(ColorFormatter(
+            format="%(asctime)s [%(levelname)s] @%(name)s %(message)s",
+        ))
         logging.basicConfig(
             level=logging.INFO,
-            format="%(asctime)s [%(levelname)s] @%(name)s %(message)s",
+            handlers=[ch],
         )
  
     capabilities = webdriver.DesiredCapabilities().FIREFOX.copy()
