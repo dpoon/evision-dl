@@ -47,7 +47,7 @@ class Robot:
         # control the destination directory and the overwrite behavior.
         #
         # It's easier to download it using Python instead.
-        logger.info("PDF URL {}".format(url))
+        logger.debug("PDF URL {}".format(url))
         dest_path = self._pdf_dest_path_for_applicant()
         cookie_string = '; '.join(
             '{0}={1}'.format(cookie['name'], cookie['value'])
