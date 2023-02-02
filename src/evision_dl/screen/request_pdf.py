@@ -21,17 +21,55 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from .. import expected_conditions as EVEC
+from ..xpath import string_literal as xpath_string
 from .application import Screen
 
 logger = logging.getLogger(__name__)
 
 class RequestPDFScreen(Screen):
 
+    # On the GPO Screen
+    MANAGE_PDF_BUTTON = (By.XPATH, '//input[@type="button"][@value="Manage Applicant PDF"]')
+
     CONTINUE_BUTTON = (By.XPATH, '//input[@value="CONTINUE"]')
     BACK_BUTTON = (By.XPATH, '//input[@value="BACK"]')
     EXIT_BUTTON = (By.XPATH, '//input[@type="button"][@value="EXIT"]')
 
     def process(self):
+        self.wait_for_dom()
+
+        # These documents tend to be encrypted, such that including them would
+        # cause PDF concatenation to fail.
+        self.deselect_unwanted_docs("Language Proficiency", "GRE")
+
+        pdf_url, err = self.try_generate_pdf()
+        if pdf_url:
+            self.robot.handle_available_pdf(pdf_url)
+        elif err:
+            self.robot.handle_unavailable_pdf(err)
+        else:
+            logger.info("Defective PDF; entering troubleshooting to isolate problematic document")
+            application_window = WebDriverWait(self.driver, 10).until(
+                EVEC.window_closed(lambda: self.click(self.EXIT_BUTTON))
+            )
+            self.driver.switch_to.window(application_window.handle)
+            self.open_window(
+                action=lambda: self.click(self.MANAGE_PDF_BUTTON),
+                expectation=EC.title_is("Manage Applicant PDF"),
+                timeout=90
+            )
+            from .request_pdf_trouble import RequestPDFTroubleshootingScreen
+            return RequestPDFTroubleshootingScreen(self.robot)
+
+        new_top_window = WebDriverWait(self.driver, 10).until(
+            EVEC.window_closed(lambda: self.click(self.EXIT_BUTTON))
+        )
+        self.driver.switch_to.window(new_top_window.handle)
+        logger.debug("Switched back to window with title \"{}\"".format(self.driver.title))
+        from .application_done import ApplicationDoneScreen
+        return ApplicationDoneScreen(self.robot)
+
+    def wait_for_dom(self):
         # This page initially contains HTML like:
         #
         # <div><div id="pdf_doc_list">
@@ -63,24 +101,22 @@ class RequestPDFScreen(Screen):
         # Therefore, we must wait until that DOM manipulation finishes.
         WebDriverWait(self.driver, 90).until(
             EC.all_of(
-                EC.presence_of_element_located((By.XPATH, '//input[@value="CONTINUE"]')),
+                EC.presence_of_element_located(self.CONTINUE_BUTTON),
                 EC.none_of(
                     EC.visibility_of_any_elements_located(
                         (By.CSS_SELECTOR, '#sitspagecontent select.sv-form-control[multiple]'),
                     ),
                 ),
-                EC.presence_of_element_located((By.XPATH,
-                    '//label[@class="pdf-check"]'
-                        '/following-sibling::select[@class="sv-form-control"][@multiple]'
-                        '/following-sibling::label[@class="pdf-check"]'
-                )),
+                EC.presence_of_element_located((By.XPATH, self._doc_checkbox_list_xpath())),
             )
         )
 
-        # These documents tend to be encrypted, such that including them would
-        # cause PDF concatenation to fail.
-        self.deselect_unwanted_docs("Language Proficiency", "GRE")
+    def deselect_unwanted_docs(self, *partial_label_texts):
+        for label in self.driver.find_elements(By.XPATH, '//label'):
+            if any(bad in label.text for bad in partial_label_texts):
+                label.click()
 
+    def try_generate_pdf(self):
         self.click(self.CONTINUE_BUTTON)
 
         # Wait for the "Select order of Document Types" page to render, as
@@ -91,38 +127,9 @@ class RequestPDFScreen(Screen):
 
         # ... but actually click on the "CONTINUE" button
         self.click(self.CONTINUE_BUTTON)
-
-        self.extract_pdf()
-
-        new_top_window = WebDriverWait(self.driver, 10).until(
-            EVEC.window_closed(lambda: self.click(self.EXIT_BUTTON))
-        )
-        self.driver.switch_to.window(new_top_window.handle)
-        logger.debug("Switched back to window with title \"{}\"".format(self.driver.title))
-        from .application_done import ApplicationDoneScreen
-        return ApplicationDoneScreen(self.robot)
-
-    def deselect_unwanted_docs(self, *partial_label_texts):
-        for label in self.driver.find_elements(By.XPATH, '//label'):
-            if any(bad in label.text for bad in partial_label_texts):
-                label.click()
+        return self.extract_pdf()
 
     def extract_pdf(self):
-        # eVision bug (INC1040643): PDF merge may fail, in which case you'll see
-        # "Please to download a copy of the document" instead of "Please
-        # _click_here_ to download a copy of the document".
-        #
-        # It could also output instead:
-        #
-        # <div class="span12">
-        #   <font color="red">Error:</font>
-        #   There has been a processing error. Please try again or contact IT
-        #   support for assistance and quote the following details:
-        #   <br>
-        #   Error ID: -3013
-        #   <br>
-        #   Application ID: 66378380|01|01.
-        # </div>
         WebDriverWait(self.driver, 120).until(
             EC.any_of(
                 EC.presence_of_element_located((By.LINK_TEXT, "click here")),
@@ -131,8 +138,33 @@ class RequestPDFScreen(Screen):
             )
         )
         if err := '\n'.join(e.text for e in self.driver.find_elements(By.XPATH, '//*[font[@color="red"]]')):
-            self.robot.handle_unavailable_pdf(err)
+            # TODO: error, worth retrying?
+            # <div class="span12">
+            #   <font color="red">Error:</font>
+            #   There has been a processing error. Please try again or contact IT
+            #   support for assistance and quote the following details:
+            #   <br>
+            #   Error ID: -3013
+            #   <br>
+            #   Application ID: 66378380|01|01.
+            # </div>
+            return None, err
         elif links := self.driver.find_elements(By.LINK_TEXT, "click here"):
-            self.robot.handle_available_pdf(links[0].get_attribute('href'))
+            # Success
+            return links[0].get_attribute('href'), None
         else:
-            self.robot.handle_unavailable_pdf()
+            # eVision bug (INC1040643): PDF merge may fail, in which case you'll see
+            # "Please to download a copy of the document" instead of "Please
+            # _click_here_ to download a copy of the document".
+            return None, None
+
+    @staticmethod
+    def _doc_checkbox_list_xpath(doc_id=None):
+        basic_xpath = '//label[@class="pdf-check"][not(contains(@style, "italic"))]'
+        if not doc_id:
+            return basic_xpath
+        else:
+            name, _, value = doc_id.partition('"')
+            return basic_xpath + '[input[@type="checkbox"][@name={}][@value={}]]'.format(
+                xpath_string(name), xpath_string(value)
+            )
