@@ -8,15 +8,36 @@ https://evision.as.it.ubc.ca.
 Prerequisites:
 
 - [Firefox](https://getfirefox.com) web browser
-- [Python](https://python.org) programming language, version >= 3.8
+- [Python](https://python.org) programming language, version >= 3.8.
+
+  On Windows, you may obtain Python for free from either the Python website
+  or the Microsoft Store.
 
 `evision-dl` uses the [Selenium WebDriver](https://selenium.dev) framework for
-controlling Firefox.
+controlling Firefox.  The installation method described here will take care
+of installing Selenium and other dependencies.
 
-Run the installation, taking code directly from the source code repository:
+### Installing from the Wheel package
+
+`pip` is a package installer that comes with Python.  (On some systems, it
+might be called `pip3` instead.)  Run a command like the following to download
+and install `evision-dl`:
 
 ```console
-$ python3 -m pip install --force-reinstall git+https://github.com/dpoon/evision-dl@stable
+$ pip install --force-reinstall https://github.com/dpoon/evision-dl/releases/download/v2023.2.0/evision_dl-2023.2.0-py3-none-any.whl
+```
+
+Releases of `evision-dl` are listed at
+https://github.com/dpoon/evision-dl/releases.
+Change the command as needed to reflect the desired version.
+
+### Installing from the source code repository
+
+If you have [`git`](https://git-scm.org) installed, you can also install
+the latest version fresh from the source code repository:
+
+```console
+$ pip install --force-reinstall git+https://github.com/dpoon/evision-dl@stable
 ```
 
 ## Running
@@ -27,13 +48,13 @@ or `powershell` on Windows) in a graphical desktop environment.
 - Create a directory to serve as a destination for the PDFs to be downloaded:
 
   ```console
-  $ mkdir evision_pdfs
+  $ mkdir 2023-phd-applicants
   ```
 
 - Run `evision-dl`:
 
   ```console
-  $ evision-dl evision_pdfs
+  $ evision-dl 2023-phd-applicants
   Waiting for user to log into eVision, bring up folder, and open the application of interest.
   ```
 
