@@ -27,6 +27,7 @@ import os
 import sys
 import warnings
 
+import colorama
 from selenium import webdriver
 from selenium.webdriver.firefox.service import Service
 
@@ -59,6 +60,8 @@ def main(*argv):
     if args is None:
         return 1
 
+    # Enable support for ANSI color sequences in the Windows console
+    colorama.init()
     if log_config := args.pop('log_config'):
         logging.config.fileConfig(log_config)
     else:

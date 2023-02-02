@@ -7,7 +7,7 @@ name = "evision_dl"
 # Since web scraping is inherently fragile, the code must change frequently to
 # match the operation of the website.  The version number format is
 # YEAR.MONTH.COUNTER
-version = "2023.1.0"
+version = "2023.2.0"
 authors = [
   { name="Dara Poon", email="dwpoon@mail.ubc.ca" },
 ]
@@ -25,6 +25,7 @@ classifiers = [
     "Topic :: Office/Business",
 ]
 dependencies = [
+    "colorama",
     "selenium>=4.6.0",
 ]
 
