@@ -27,7 +27,8 @@ class Robot:
         self.opts = opts
         self._user_agent = self.driver.execute_script('return navigator.userAgent')
         self._current_applicant = None
-        self.success_count = self.error_count = 0
+        self.successes = []
+        self.failures = []
 
     def run(self, initial_screen_class):
         try:
@@ -39,12 +40,17 @@ class Robot:
             return 2
         except Exception:
             logger.exception("Crashed with uncaught exception")
-            self.error_count += 1
+            if self._current_applicant:
+                self.handle_unavailable_pdf()
             return 1
         finally:
             logger.info("Downloaded {} PDFs successfully and {} unsuccessfully".format(
-                self.success_count, self.error_count
+                len(self.successes), len(self.failures)
             ))
+            if self.failures:
+                logger.error("Recap of failures:")
+                for f in self.failures:
+                    logger.error(f)
 
     def handle_switch_to_applicant(self, applicant):
         logger.info(applicant)
@@ -56,7 +62,8 @@ class Robot:
         with open(dest_path, 'wb') as f:
             # Just make an empty file as evidence of the failure
             pass
-        self.error_count += 1
+        self.failures.append(self._current_applicant)
+        self._current_applicant = None
 
     def handle_available_pdf(self, url):
         # Downloading files using the webdriver is complicated.  We don't know
@@ -81,8 +88,8 @@ class Robot:
         with opener.open(url) as res, open(dest_path, 'wb') as f:
             f.write(res.read())
         logger.info("Downloaded PDF to {}".format(dest_path))
+        self.successes.append(self._current_applicant)
         self._current_applicant = None
-        self.success_count += 1
 
     def _pdf_dest_path_for_applicant(self):
         surname = self._current_applicant.surname
