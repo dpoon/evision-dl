@@ -130,7 +130,7 @@ class RequestPDFScreen(Screen):
         return self.extract_pdf()
 
     def extract_pdf(self):
-        WebDriverWait(self.driver, 120).until(
+        WebDriverWait(self.driver, 3600).until(
             EC.any_of(
                 EC.presence_of_element_located((By.LINK_TEXT, "click here")),
                 EC.presence_of_element_located((By.XPATH, '//*[font[@color="red"]]')),
