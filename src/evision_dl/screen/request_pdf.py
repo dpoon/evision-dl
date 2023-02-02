@@ -135,6 +135,7 @@ class RequestPDFScreen(Screen):
                 EC.presence_of_element_located((By.LINK_TEXT, "click here")),
                 EC.presence_of_element_located((By.XPATH, '//*[font[@color="red"]]')),
                 EC.text_to_be_present_in_element((By.CSS_SELECTOR, '#sitspagecontent div'), "Please to download a copy of the document"),
+                EC.text_to_be_present_in_element((By.CSS_SELECTOR, 'p'), "Error details"),
             )
         )
         if err := '\n'.join(e.text for e in self.driver.find_elements(By.XPATH, '//*[font[@color="red"]]')):
@@ -152,11 +153,26 @@ class RequestPDFScreen(Screen):
         elif links := self.driver.find_elements(By.LINK_TEXT, "click here"):
             # Success
             return links[0].get_attribute('href'), None
-        else:
+        elif self.driver.find_elements(By.CSS_SELECTOR, '#sitspagecontent div'):
             # eVision bug (INC1040643): PDF merge may fail, in which case you'll see
             # "Please to download a copy of the document" instead of "Please
             # _click_here_ to download a copy of the document".
             return None, None
+        else:
+            # <body>
+            #   <h1>Attention</h1>
+            #   <p>An error occurred which prevented the execution of your request.</p>
+            #   <p>(Problem-specific error page not found)</p>
+            #   <p>Error details :</p>
+            #   <hr>
+            #   Middleware : UV8<br>
+            #   Error# : -25<br>
+            #   Error Text : see UNIFACE message guide<br>
+            #   <hr>
+            #   <p>Please contact your system administrator.</p>
+            # </body>
+            err = self.driver.find_element(By.CSS_SELECTOR, 'body').text
+            return None, err
 
     @staticmethod
     def _doc_checkbox_list_xpath(doc_id=None):
