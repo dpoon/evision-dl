@@ -16,6 +16,7 @@
 
 import logging
 
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -121,7 +122,7 @@ class RequestPDFScreen(Screen):
 
         # Wait for the "Select order of Document Types" page to render, as
         # evidenced by the presence of a "BACK" button
-        WebDriverWait(self.driver, 120).until(EC.presence_of_element_located(
+        WebDriverWait(self.driver, 300).until(EC.presence_of_element_located(
             self.BACK_BUTTON
         ))
 
@@ -130,14 +131,20 @@ class RequestPDFScreen(Screen):
         return self.extract_pdf()
 
     def extract_pdf(self):
-        WebDriverWait(self.driver, 3600).until(
-            EC.any_of(
-                EC.presence_of_element_located((By.LINK_TEXT, "click here")),
-                EC.presence_of_element_located((By.XPATH, '//*[font[@color="red"]]')),
-                EC.text_to_be_present_in_element((By.CSS_SELECTOR, '#sitspagecontent div'), "Please to download a copy of the document"),
-                EC.text_to_be_present_in_element((By.CSS_SELECTOR, 'p'), "Error details"),
+        WebDriverWait(self.driver, 3600).until(EC.invisibility_of_element_located(self.CONTINUE_BUTTON))
+        try:
+            WebDriverWait(self.driver, 30).until(
+                EC.any_of(
+                    EC.presence_of_element_located((By.LINK_TEXT, "click here")),
+                    EC.presence_of_element_located((By.XPATH, '//*[font[@color="red"]]')),
+                    EC.text_to_be_present_in_element((By.CSS_SELECTOR, '#sitspagecontent div'), "Please to download a copy of the document"),
+                    EC.text_to_be_present_in_element((By.CSS_SELECTOR, 'p'), "Error details"),
+                )
             )
-        )
+        except TimeoutException:
+            # Ideally we want to see one of the known types of result pages,
+            # but if not, we can just report what's in the <body>.
+            pass
         if err := '\n'.join(e.text for e in self.driver.find_elements(By.XPATH, '//*[font[@color="red"]]')):
             # TODO: error, worth retrying?
             # <div class="span12">
