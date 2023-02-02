@@ -17,6 +17,8 @@
 import logging
 import re
 
+from retry import retry
+from selenium.common.exceptions import StaleElementReferenceException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -30,13 +32,14 @@ logger = logging.getLogger(__name__)
 
 class ApplicationDetailsScreen(ApplicationScreen):
     def process(self):
+        self.activate_tab("Personal\xa0Details")  # \xa0 = NO-BREAK SPACE
         applicant = self.extract_applicant_context()
         self.robot.handle_switch_to_applicant(applicant)
         self.activate_tab("GPO")
         return GPOScreen(self.robot)
 
+    @retry(StaleElementReferenceException)
     def extract_applicant_context(self):
-        self.activate_tab("Personal\xa0Details")  # \xa0 = NO-BREAK SPACE
         h3_text = self.driver.find_element(By.TAG_NAME, 'h3').text
         student_number = re.findall(r"Student No: (\d{8})", h3_text)[0]
         surname = self._extract_table_text("Family Name(Surname):")
