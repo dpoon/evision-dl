@@ -17,6 +17,8 @@
 from retry import retry
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 from ..screen import Screen
 from ..xpath import string_literal as xpath_string
@@ -24,4 +26,8 @@ from ..xpath import string_literal as xpath_string
 class ApplicationScreen(Screen):
     @retry(TimeoutException)
     def activate_tab(self, tab_label):
-        self.click((By.XPATH, '//li[@role="tab"][@title={}]/a'.format(xpath_string(tab_label))))
+        li_xpath = '//li[@role="tab"][@title={}]'.format(xpath_string(tab_label))
+        self.click((By.XPATH, li_xpath + '/a'))
+        WebDriverWait(self.driver, 30).until(
+            EC.presence_of_element_located((By.XPATH, li_xpath + '[@aria-selected="true"]'))
+        )
