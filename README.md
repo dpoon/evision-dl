@@ -24,7 +24,7 @@ might be called `pip3` instead.)  Run a command like the following to download
 and install `evision-dl`:
 
 ```console
-$ pip install --force-reinstall https://github.com/dpoon/evision-dl/releases/download/v2023.2.2/evision_dl-2023.2.2-py3-none-any.whl
+$ pip install --force-reinstall https://github.com/dpoon/evision-dl/releases/download/v2023.2.3/evision_dl-2023.2.3-py3-none-any.whl
 ```
 
 Releases of `evision-dl` are listed at
