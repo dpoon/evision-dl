@@ -23,7 +23,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-from ..applicant_context import ApplicantContext
+from ..applicant import Applicant
+from ..download import ApplicantContextChangeEvent
 from ..xpath import string_literal as xpath_string
 from .application import ApplicationScreen
 from .gpo import GPOScreen
@@ -34,7 +35,7 @@ class ApplicationDetailsScreen(ApplicationScreen):
     def process(self):
         self.activate_tab("Personal\xa0Details")  # \xa0 = NO-BREAK SPACE
         applicant = self.extract_applicant_context()
-        self.robot.handle_switch_to_applicant(applicant)
+        self.robot.post_event(ApplicantContextChangeEvent(applicant))
         self.activate_tab("GPO")
         return GPOScreen(self.robot)
 
@@ -45,7 +46,7 @@ class ApplicationDetailsScreen(ApplicationScreen):
         surname = self._extract_table_text("Family Name(Surname):")
         preferred_name = self._extract_table_text("Preferred Name:") or \
             self._extract_table_text("Given Name:")
-        return ApplicantContext(student_number, surname, preferred_name)
+        return Applicant(student_number, surname, preferred_name)
 
     def _extract_table_text(self, label):
         td = WebDriverWait(self.driver, 30).until(

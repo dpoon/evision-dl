@@ -21,6 +21,11 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from .. import expected_conditions as EVEC
+from ..download import (
+    PDFGenerationCaveatEvent,
+    PDFGenerationFailureEvent,
+    PDFGenerationSuccessEvent,
+)
 from .request_pdf import RequestPDFScreen
 
 logger = logging.getLogger(__name__)
@@ -34,17 +39,17 @@ class RequestPDFTroubleshootingScreen(RequestPDFScreen):
         logger.debug("Documents available: {}".format(list(self.docs.values())))
 
         problematic_doc_ids = self.detect_problematic_docs()
-        logger.warning("Problematic documents: {}".format([self.docs[d] for d in problematic_doc_ids]))
+        problematic_doc_names = [self.docs[d] for d in problematic_doc_ids]
+        logger.warning("Problematic documents: {}".format(problematic_doc_names))
+        self.robot.post_event(PDFGenerationCaveatEvent(problematic_doc_names))
 
         for doc_id in problematic_doc_ids:
             self.deselect_doc_by_id(doc_id)
 
-        # Pretty sure it should work now!
-        pdf_url, err = self.try_generate_pdf()
-        if pdf_url:
-            self.robot.handle_available_pdf(pdf_url)
-        else:
-            self.robot.handle_unavailable_pdf(err)
+        # Pretty sure it should work now, though errors are not 100% deterministic
+        pdf_generation_event = self.try_generate_pdf() or \
+            PDFGenerationFailureEvent("The attempt to isolate problematic documents didn't work")
+        self.robot.post_event(pdf_generation_event)
 
         application_window = WebDriverWait(self.driver, 10).until(
             EVEC.window_closed(lambda: self.click(self.EXIT_BUTTON))
@@ -64,12 +69,16 @@ class RequestPDFTroubleshootingScreen(RequestPDFScreen):
         for doc in self.docs:
             if doc != doc_id:
                 self.deselect_doc_by_id(doc)
-        pdf_url, _ = self.try_generate_pdf()
-        logger.debug("Document {} {} OK".format(doc_id, "is" if pdf_url else "is not"))
-        return not(pdf_url)
+        pdf_generation_event = self.try_generate_pdf()
+        if isinstance(pdf_generation_event, PDFGenerationSuccessEvent):
+            logger.debug("Document {} is OK".format(doc_id))
+            return False
+        else:
+            logger.debug("Document {} is not OK".format(doc_id))
+            return True
 
     def try_generate_pdf(self):
-        pdf, err = super().try_generate_pdf()
+        pdf_generation_event = super().try_generate_pdf()
 
         # Got our result.  Close the result window and reopen it.
         application_window = WebDriverWait(self.driver, 10).until(
@@ -91,7 +100,7 @@ class RequestPDFTroubleshootingScreen(RequestPDFScreen):
         if docs != self.docs:
             logger.warning("Documents available changed to: {}".format(docs))
 
-        return pdf, err
+        return pdf_generation_event
 
     def deselect_doc_by_id(self, doc_id):
         self.driver.find_element(By.XPATH, self._doc_checkbox_list_xpath(doc_id)).click()

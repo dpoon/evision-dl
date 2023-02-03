@@ -31,8 +31,11 @@ import colorama
 from selenium import webdriver
 from selenium.webdriver.firefox.service import Service
 
+from evision_dl.applicant import ApplicantContextChangeListener
+from evision_dl.download import Downloader
 from evision_dl.logging import ColorFormatter
 from evision_dl.robot import Robot
+from evision_dl.summary import Summarizer
 from evision_dl.screen.start import StartScreen
 
 logger = logging.getLogger(__name__)
@@ -85,7 +88,12 @@ def main(*argv):
             capabilities=capabilities,
             service=Service(log_path=args.pop('webdriver_log'))
         )
-    return Robot(driver, args).run(StartScreen)
+
+    robot = Robot(driver)
+    robot.add_event_listener(ApplicantContextChangeListener())
+    robot.add_event_listener(Downloader(args['dest_dir']))
+    robot.add_event_listener(Summarizer())
+    return robot.run(StartScreen)
 
 if __name__ == '__main__':
     sys.exit(main() or 0)

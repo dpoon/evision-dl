@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU General Public License along with
 # evision-dl. If not, see <https://www.gnu.org/licenses/>.
 
+from functools import lru_cache as memoized
 import logging
 
 from selenium.common.exceptions import TimeoutException
@@ -22,6 +23,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from .. import expected_conditions as EVEC
+from ..download import (
+    PDFGenerationFailureEvent,
+    PDFGenerationSuccessEvent,
+)
 from ..xpath import string_literal as xpath_string
 from .application import Screen
 
@@ -43,13 +48,11 @@ class RequestPDFScreen(Screen):
         # cause PDF concatenation to fail.
         self.deselect_unwanted_docs("Language Proficiency", "GRE")
 
-        pdf_url, err = self.try_generate_pdf()
-        if pdf_url:
-            self.robot.handle_available_pdf(pdf_url)
-        elif err:
-            self.robot.handle_unavailable_pdf(err)
+        pdf_generation_event = self.try_generate_pdf()
+        if pdf_generation_event is not None:
+            self.robot.post_event(pdf_generation_event)
         else:
-            logger.info("Defective PDF; entering troubleshooting to isolate problematic document")
+            logger.info("Defective PDF; entering troubleshooting to isolate problematic documents")
             application_window = WebDriverWait(self.driver, 10).until(
                 EVEC.window_closed(lambda: self.click(self.EXIT_BUTTON))
             )
@@ -156,15 +159,24 @@ class RequestPDFScreen(Screen):
             #   <br>
             #   Application ID: 66378380|01|01.
             # </div>
-            return None, err
+            return PDFGenerationFailureEvent(err)
         elif links := self.driver.find_elements(By.LINK_TEXT, "click here"):
             # Success
-            return links[0].get_attribute('href'), None
+            url = links[0].get_attribute('href')
+            cookies = '; '.join(
+                '{0}={1}'.format(cookie['name'], cookie['value'])
+                for cookie in self.driver.get_cookies()
+            )
+            http_headers = [
+                ('Cookie', cookies),
+                ('User-Agent', type(self)._user_agent(self.driver)),
+            ]
+            return PDFGenerationSuccessEvent(url, http_headers)
         elif self.driver.find_elements(By.CSS_SELECTOR, '#sitspagecontent div'):
             # eVision bug (INC1040643): PDF merge may fail, in which case you'll see
             # "Please to download a copy of the document" instead of "Please
             # _click_here_ to download a copy of the document".
-            return None, None
+            return None
         else:
             # <body>
             #   <h1>Attention</h1>
@@ -179,7 +191,7 @@ class RequestPDFScreen(Screen):
             #   <p>Please contact your system administrator.</p>
             # </body>
             err = self.driver.find_element(By.CSS_SELECTOR, 'body').text
-            return None, err
+            return PDFGenerationFailureEvent(err)
 
     @staticmethod
     def _doc_checkbox_list_xpath(doc_id=None):
@@ -191,3 +203,11 @@ class RequestPDFScreen(Screen):
             return basic_xpath + '[input[@type="checkbox"][@name={}][@value={}]]'.format(
                 xpath_string(name), xpath_string(value)
             )
+
+    @staticmethod
+    @memoized(maxsize=1)
+    def _user_agent(driver):
+        # Get the browser's User-Agent string, and cache it.
+        # The User-Agent must match the browser's, else eVision will
+        # invalidate the whole session
+        return driver.execute_script('return navigator.userAgent')

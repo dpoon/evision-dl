@@ -15,7 +15,30 @@
 # evision-dl. If not, see <https://www.gnu.org/licenses/>.
 
 from collections import namedtuple
+import logging
 
-class ApplicantContext(namedtuple('ApplicantContext', 'student_number surname preferred_name')):
+from .event import Event, EventListener
+
+logger = logging.getLogger(__name__)
+
+######################################################################
+
+class Applicant(namedtuple('Applicant', 'student_number surname preferred_name')):
     def __str__(self):
         return "Applicant {}, {} ({})".format(self.surname, self.preferred_name, self.student_number)
+
+######################################################################
+
+class ApplicantContextChangeEvent(Event):
+    def __init__(self, applicant):
+        self.applicant = applicant
+
+######################################################################
+
+class ApplicantContextChangeListener(EventListener):
+    def handle_event(self, robot, event):
+        if isinstance(event, ApplicantContextChangeEvent):
+            if event.applicant is None:
+                logger.debug("Cleared applicant context")
+            else:
+                logger.info(event.applicant)
