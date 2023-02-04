@@ -15,6 +15,7 @@
 # evision-dl. If not, see <https://www.gnu.org/licenses/>.
 
 import logging
+from typing import List, Optional
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -22,17 +23,19 @@ from selenium.webdriver.support.wait import WebDriverWait
 
 from .. import expected_conditions as EVEC
 from ..download import (
+    PDFGenerationEvent,
     PDFGenerationCaveatEvent,
     PDFGenerationFailureEvent,
     PDFGenerationSuccessEvent,
 )
+from . import Screen
 from .request_pdf import RequestPDFScreen
 
 logger = logging.getLogger(__name__)
 
 class RequestPDFTroubleshootingScreen(RequestPDFScreen):
 
-    def process(self):
+    def process(self) -> Screen:
         self.wait_for_dom()
 
         self.docs = self._parse_doc_list()
@@ -58,13 +61,13 @@ class RequestPDFTroubleshootingScreen(RequestPDFScreen):
         from .application_done import ApplicationDoneScreen
         return ApplicationDoneScreen(self.robot)
 
-    def detect_problematic_docs(self):
+    def detect_problematic_docs(self) -> List[str]:
         return [
             doc_id for doc_id in self.docs
             if self.detect_problematic_doc(doc_id)
         ]
 
-    def detect_problematic_doc(self, doc_id):
+    def detect_problematic_doc(self, doc_id:str) -> bool:
         # Deselect all docs except the one we are testing
         for doc in self.docs:
             if doc != doc_id:
@@ -77,7 +80,7 @@ class RequestPDFTroubleshootingScreen(RequestPDFScreen):
             logger.debug("Document {} is not OK".format(doc_id))
             return True
 
-    def try_generate_pdf(self):
+    def try_generate_pdf(self) -> Optional[PDFGenerationEvent]:
         pdf_generation_event = super().try_generate_pdf()
 
         # Got our result.  Close the result window and reopen it.
@@ -102,7 +105,7 @@ class RequestPDFTroubleshootingScreen(RequestPDFScreen):
 
         return pdf_generation_event
 
-    def deselect_doc_by_id(self, doc_id):
+    def deselect_doc_by_id(self, doc_id:str):
         self.driver.find_element(By.XPATH, self._doc_checkbox_list_xpath(doc_id)).click()
 
     def _parse_doc_list(self):

@@ -25,6 +25,7 @@ import logging
 import logging.config
 import os
 import sys
+from typing import Any, Dict, Sequence
 import warnings
 
 import colorama
@@ -40,7 +41,7 @@ from evision_dl.screen.start import StartScreen
 
 logger = logging.getLogger(__name__)
 
-def parse_args(args):
+def parse_args(args:Sequence[str]) -> Dict[str, Any]:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('dest_dir',
         help='Directory to which PDFs should be saved')
@@ -48,19 +49,19 @@ def parse_args(args):
         help='Python logging configuration (see https://docs.python.org/3/library/logging.config.html#logging-config-fileformat)')
     parser.add_argument('--webdriver-log', metavar='webdriver.log', default=os.devnull,
         help='Webdriver log file (such as geckodriver.log)')
-    args = parser.parse_args(args)
-    if not os.path.isdir(args.dest_dir):
-        print("Directory '{0}' does not exist".format(args.dest_dir), file=sys.stderr)
-        return None
+    ns = parser.parse_args(args)
+    if not os.path.isdir(ns.dest_dir):
+        print("Directory '{0}' does not exist".format(ns.dest_dir), file=sys.stderr)
+        return {}
     return {
-        'dest_dir': args.dest_dir,
-        'log_config': args.log_config,
-        'webdriver_log': args.webdriver_log,
+        'dest_dir': ns.dest_dir,
+        'log_config': ns.log_config,
+        'webdriver_log': ns.webdriver_log,
     }
 
-def main(*argv):
+def main(*argv:str) -> int:
     args = parse_args(argv or sys.argv[1:])
-    if args is None:
+    if not args:
         return 1
 
     # Enable support for ANSI color sequences in the Windows console

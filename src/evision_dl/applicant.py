@@ -16,27 +16,29 @@
 
 from collections import namedtuple
 import logging
+from typing import Optional
 
 from .event import Event, EventListener
+from .robot import Robot
 
 logger = logging.getLogger(__name__)
 
 ######################################################################
 
 class Applicant(namedtuple('Applicant', 'student_number surname preferred_name')):
-    def __str__(self):
+    def __str__(self) -> str:
         return "Applicant {}, {} ({})".format(self.surname, self.preferred_name, self.student_number)
 
 ######################################################################
 
 class ApplicantContextChangeEvent(Event):
-    def __init__(self, applicant):
+    def __init__(self, applicant:Optional[Applicant]):
         self.applicant = applicant
 
 ######################################################################
 
 class ApplicantContextChangeListener(EventListener):
-    def handle_event(self, robot, event):
+    def handle_event(self, robot: Robot, event: Event) -> None:
         if isinstance(event, ApplicantContextChangeEvent):
             if event.applicant is None:
                 logger.debug("Cleared applicant context")

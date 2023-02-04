@@ -24,7 +24,7 @@ bold_red = "\x1b[31;1m"
 reset = "\x1b[0m"
 
 class ColorFormatter(logging.Formatter):
-    def __init__(self, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"):
+    def __init__(self, format:str="%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"):
         self.FORMATS = {
             logging.DEBUG: grey + format + reset,
             logging.INFO: grey + format + reset,
@@ -33,7 +33,7 @@ class ColorFormatter(logging.Formatter):
             logging.CRITICAL: bold_red + format + reset,
         }
 
-    def format(self, record):
+    def format(self, record:logging.LogRecord) -> str:
         log_fmt = self.FORMATS.get(record.levelno)
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)

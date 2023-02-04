@@ -15,9 +15,11 @@
 # evision-dl. If not, see <https://www.gnu.org/licenses/>.
 
 import logging
+from typing import Any, List, Tuple, Union
 
 from .applicant import Applicant, ApplicantContextChangeEvent
 from .download import (
+    PDFFailureEvent,
     PDFGenerationCaveatEvent,
     PDFGenerationFailureEvent,
     PDFDownloadFailureEvent,
@@ -31,11 +33,11 @@ logger = logging.getLogger(__name__)
 class Summarizer(EventListener):
     def __init__(self):
         self.current_applicant = None
-        self.successes = []
-        self.caveats = []
-        self.failures = []
+        self.successes: List[Tuple[Any, PDFDownloadSuccessEvent]] = []
+        self.caveats: List[Tuple[Any, PDFGenerationCaveatEvent]] = []
+        self.failures: List[Tuple[Any, PDFFailureEvent]] = []
 
-    def handle_event(self, robot, event):
+    def handle_event(self, robot:Robot, event:Event) -> None:
         if isinstance(event, ApplicantContextChangeEvent):
             self.current_applicant = event.applicant
         elif isinstance(event, PDFGenerationCaveatEvent):
@@ -51,10 +53,10 @@ class Summarizer(EventListener):
             # applicant context that hasn't been cleared yet, we should count
             # the current applicant as a failure.
             if event.exception and self.current_applicant:
-                self.failures.append((self.current_applicant, ...))
+                self.failures.append((self.current_applicant, PDFFailureEvent("crashed")))
             self.output_summary()
 
-    def output_summary(self):
+    def output_summary(self) -> None:
         logger.info("Downloaded {} PDFs successfully and {} unsuccessfully".format(
             len(self.successes), len(self.failures)
         ))
@@ -65,4 +67,4 @@ class Summarizer(EventListener):
         if self.failures:
             logger.error("Recap of failures:")
             for applicant, event in self.failures:
-                logger.error(applicant)
+                logger.error("{} ({})".format(applicant))

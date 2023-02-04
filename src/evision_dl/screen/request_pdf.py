@@ -15,20 +15,24 @@
 # evision-dl. If not, see <https://www.gnu.org/licenses/>.
 
 from functools import lru_cache as memoized
+from typing import Optional
 import logging
 
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
 from .. import expected_conditions as EVEC
 from ..download import (
+    PDFGenerationEvent,
     PDFGenerationFailureEvent,
     PDFGenerationSuccessEvent,
 )
 from ..xpath import string_literal as xpath_string
 from .application import Screen
+from . import Screen
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +45,7 @@ class RequestPDFScreen(Screen):
     BACK_BUTTON = (By.XPATH, '//input[@value="BACK"]')
     EXIT_BUTTON = (By.XPATH, '//input[@type="button"][@value="EXIT"]')
 
-    def process(self):
+    def process(self) -> Screen:
         self.wait_for_dom()
 
         # These documents tend to be encrypted, such that including them would
@@ -73,7 +77,7 @@ class RequestPDFScreen(Screen):
         from .application_done import ApplicationDoneScreen
         return ApplicationDoneScreen(self.robot)
 
-    def wait_for_dom(self):
+    def wait_for_dom(self) -> None:
         # This page initially contains HTML like:
         #
         # <div><div id="pdf_doc_list">
@@ -115,12 +119,12 @@ class RequestPDFScreen(Screen):
             )
         )
 
-    def deselect_unwanted_docs(self, *partial_label_texts):
+    def deselect_unwanted_docs(self, *partial_label_texts:str) -> None:
         for label in self.driver.find_elements(By.XPATH, '//label'):
             if any(bad in label.text for bad in partial_label_texts):
                 label.click()
 
-    def try_generate_pdf(self):
+    def try_generate_pdf(self) -> Optional[PDFGenerationEvent]:
         self.click(self.CONTINUE_BUTTON)
 
         # Wait for the "Select order of Document Types" page to render, as
@@ -133,7 +137,7 @@ class RequestPDFScreen(Screen):
         self.click(self.CONTINUE_BUTTON)
         return self.extract_pdf()
 
-    def extract_pdf(self):
+    def extract_pdf(self) -> Optional[PDFGenerationEvent]:
         WebDriverWait(self.driver, 3600).until(EC.invisibility_of_element_located(self.CONTINUE_BUTTON))
         try:
             WebDriverWait(self.driver, 30).until(
@@ -194,7 +198,7 @@ class RequestPDFScreen(Screen):
             return PDFGenerationFailureEvent(err)
 
     @staticmethod
-    def _doc_checkbox_list_xpath(doc_id=None):
+    def _doc_checkbox_list_xpath(doc_id: Optional[str] = None) -> str:
         basic_xpath = '//label[@class="pdf-check"][not(contains(@style, "italic"))]'
         if not doc_id:
             return basic_xpath
@@ -206,7 +210,7 @@ class RequestPDFScreen(Screen):
 
     @staticmethod
     @memoized(maxsize=1)
-    def _user_agent(driver):
+    def _user_agent(driver:WebDriver) -> str:
         # Get the browser's User-Agent string, and cache it.
         # The User-Agent must match the browser's, else eVision will
         # invalidate the whole session

@@ -14,6 +14,10 @@
 # You should have received a copy of the GNU General Public License along with
 # evision-dl. If not, see <https://www.gnu.org/licenses/>.
 
+from typing import Any, TYPE_CHECKING
+if TYPE_CHECKING:
+    from .robot import Robot
+
 ######################################################################
 
 # Abstract class
@@ -24,5 +28,5 @@ class Event:
 
 # Abstract class
 class EventListener:
-    def handle_event(self, robot, context, event):
+    def handle_event(self, robot: 'Robot', event: Event) -> None:
         raise NotImplementedError

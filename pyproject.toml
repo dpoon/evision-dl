@@ -36,3 +36,9 @@ repository = "https://github.com/dpoon/evision-dl"
 
 [project.scripts]
 "evision-dl" = "evision_dl.main:main"
+
+[tools.pyright]
+include = ["src"]
+exclude = [
+    "**/__pycache__",
+]

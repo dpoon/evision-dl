@@ -15,38 +15,43 @@
 # evision-dl. If not, see <https://www.gnu.org/licenses/>.
 
 import logging
+from typing import Optional, Type
+
+from selenium.webdriver.remote.webdriver import WebDriver
 
 from .event import Event, EventListener
+from .screen import Screen
 
 logger = logging.getLogger(__name__)
 
 ######################################################################
 
 class RobotFinishingEvent(Event):
-    def __init__(self, exception=None):
+    def __init__(self, exception:Optional[Exception]=None):
         self.exception = exception
 
 ######################################################################
 
 class Robot:
-    def __init__(self, driver):
+    def __init__(self, driver: WebDriver):
         self.driver = driver
         self.event_listeners = set()
 
-    def add_event_listener(self, listener):
+    def add_event_listener(self, listener: EventListener) -> None:
         self.event_listeners.add(listener)
 
-    def post_event(self, event):
+    def post_event(self, event: Event) -> None:
         # TODO: exception handling
         for listener in self.event_listeners:
             listener.handle_event(self, event)
 
-    def run(self, initial_screen_class):
+    def run(self, initial_screen_class: Type[Screen]) -> int:
         try:
             screen = initial_screen_class(self)
             while screen:
                 screen = screen.process()
             self.post_event(RobotFinishingEvent())
+            return 0
         except KeyboardInterrupt:
             logger.error("Keyboard interrupt")
             self.post_event(RobotFinishingEvent())

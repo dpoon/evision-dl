@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License along with
 # evision-dl. If not, see <https://www.gnu.org/licenses/>.
 
-def string_literal(s):
+def string_literal(s:str):
     # https://www.w3.org/TR/xpath-31/#id-literals
     if "'" in s:
         return '"' + s.replace('"', '""') + '"'

@@ -26,13 +26,14 @@ from selenium.webdriver.support.wait import WebDriverWait
 from ..applicant import Applicant
 from ..download import ApplicantContextChangeEvent
 from ..xpath import string_literal as xpath_string
+from . import Screen
 from .application import ApplicationScreen
 from .gpo import GPOScreen
 
 logger = logging.getLogger(__name__)
 
 class ApplicationDetailsScreen(ApplicationScreen):
-    def process(self):
+    def process(self) -> Screen:
         self.activate_tab("Personal\xa0Details")  # \xa0 = NO-BREAK SPACE
         applicant = self.extract_applicant_context()
         self.robot.post_event(ApplicantContextChangeEvent(applicant))
@@ -40,7 +41,7 @@ class ApplicationDetailsScreen(ApplicationScreen):
         return GPOScreen(self.robot)
 
     @retry(StaleElementReferenceException)
-    def extract_applicant_context(self):
+    def extract_applicant_context(self) -> Applicant:
         h3_text = self.driver.find_element(By.TAG_NAME, 'h3').text
         student_number = re.findall(r"Student No: (\d{8})", h3_text)[0]
         surname = self._extract_table_text("Family Name(Surname):")
@@ -48,7 +49,7 @@ class ApplicationDetailsScreen(ApplicationScreen):
             self._extract_table_text("Given Name:")
         return Applicant(student_number, surname, preferred_name)
 
-    def _extract_table_text(self, label):
+    def _extract_table_text(self, label:str) -> str:
         td = WebDriverWait(self.driver, 30).until(
             EC.presence_of_element_located((By.XPATH, '//td[strong[text()={}]]'.format(xpath_string(label))))
         )

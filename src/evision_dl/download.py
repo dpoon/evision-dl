@@ -16,6 +16,7 @@
 
 import logging
 import os
+from typing import List, Optional, Tuple
 from urllib.request import build_opener
 from urllib.parse import urlparse
 
@@ -25,51 +26,60 @@ from .robot import Robot
 
 ######################################################################
 
+class PDFFailureEvent(Event):
+    def __init__(self, message: str):
+        self.message = message
+
+    def __str__(self) -> str:
+        return self.message
+
+######################################################################
+
 class PDFGenerationEvent(Event):
     pass
 
 class PDFGenerationCaveatEvent(PDFGenerationEvent):
-    def __init__(self, message):
-        self.message = message
+    def __init__(self, problems:List[str]):
+        self.problems = problems
 
     def __str__(self):
-        return "problematic PDF documents: {}".format(self.message)
+        return "problematic PDF documents: {}".format(self.problems)
 
-class PDFGenerationFailureEvent(PDFGenerationEvent):
-    def __init__(self, message):
+class PDFGenerationFailureEvent(PDFGenerationEvent, PDFFailureEvent):
+    def __init__(self, message:str):
         self.message = message
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "no PDF: {}" + (": " + self.message if self.message else '')
 
 class PDFGenerationSuccessEvent(PDFGenerationEvent):
-    def __init__(self, url, http_headers):
+    def __init__(self, url:str, http_headers:List[Tuple[str, str]]):
         self.url = url
         self.http_headers = http_headers
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "PDF available at {}".format(self.url)
 
 ######################################################################
 
 class PDFDownloadEvent(Event):
-    def __init__(self, applicant):
+    def __init__(self, applicant: Applicant):
         self.applicant = applicant
 
-class PDFDownloadFailureEvent(PDFDownloadEvent):
-    def __init__(self, applicant, exception):
+class PDFDownloadFailureEvent(PDFDownloadEvent, PDFFailureEvent):
+    def __init__(self, applicant: Applicant, exception: Optional[Exception]):
         super().__init__(applicant)
         self.exception = exception
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "Failed to download PDF for {}: {}".format(self.applicant, self.exception)
 
 class PDFDownloadSuccessEvent(PDFDownloadEvent):
-    def __init__(self, applicant, dest_path):
+    def __init__(self, applicant: Applicant, dest_path: str):
         super().__init__(applicant)
         self.dest_path = dest_path
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "Downloaded PDF for {} to {}".format(self.applicant, self.dest_path)
 
 ######################################################################
@@ -77,17 +87,18 @@ class PDFDownloadSuccessEvent(PDFDownloadEvent):
 logger = logging.getLogger(__name__)
 
 class Downloader(EventListener):
-    def __init__(self, dest_dir):
+    def __init__(self, dest_dir: str):
         self.dest_dir = dest_dir
-        self.current_applicant = None
+        self.current_applicant:Optional[Applicant] = None
 
-    def handle_event(self, robot, event):
+    def handle_event(self, robot:Robot, event:Event) -> None:
         if isinstance(event, ApplicantContextChangeEvent):
             self.current_applicant = event.applicant
         elif isinstance(event, PDFGenerationFailureEvent):
             self._handle_unavailable_pdf(event.message)
             robot.post_event(ApplicantContextChangeEvent(None))
         elif isinstance(event, PDFGenerationSuccessEvent):
+            assert self.current_applicant is not None
             try:
                 dest_path = self._handle_available_pdf(event.url, event.http_headers)
                 robot.post_event(PDFDownloadSuccessEvent(self.current_applicant, dest_path))
@@ -97,7 +108,7 @@ class Downloader(EventListener):
         elif isinstance(event, PDFDownloadEvent):
             robot.post_event(ApplicantContextChangeEvent(None))
 
-    def _handle_unavailable_pdf(self, error_msg):
+    def _handle_unavailable_pdf(self, error_msg: str) -> str:
         logger.error("No PDF generated for {}".format(self.current_applicant))
         dest_path = self._pdf_dest_path_for_applicant()
         with open(dest_path, 'wb') as f:
@@ -105,7 +116,7 @@ class Downloader(EventListener):
             pass
         return dest_path
 
-    def _handle_available_pdf(self, url, http_headers):
+    def _handle_available_pdf(self, url: str, http_headers: List[Tuple[str, str]]) -> str:
         # Downloading files using the webdriver is complicated.  We don't know
         # whether the browser will display the PDF, launch a helper application
         # to view it, use a plugin, or save it.  If saving, it's hard to
@@ -121,7 +132,8 @@ class Downloader(EventListener):
         logger.info("Downloaded PDF to {}".format(dest_path))
         return dest_path
 
-    def _pdf_dest_path_for_applicant(self):
+    def _pdf_dest_path_for_applicant(self) -> str:
+        assert self.current_applicant is not None
         surname = self.current_applicant.surname
         preferred_name = self.current_applicant.preferred_name
         student_number = self.current_applicant.student_number

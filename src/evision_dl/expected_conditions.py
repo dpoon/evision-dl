@@ -15,7 +15,10 @@
 # evision-dl. If not, see <https://www.gnu.org/licenses/>.
 
 from collections import namedtuple
+from typing import Any, Callable, Optional
 import logging
+
+from selenium.webdriver.remote.webdriver import WebDriver
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +31,11 @@ class window_opened(object):
     be initialized with a zero-argument callback that, when invoked, performs
     the action that would open the window.
     """
-    def __init__(self, action=None):
+    def __init__(self, action: Optional[Callable[[], Any]] = None):
         self.action = action
         self.orig_windows = None
 
-    def __call__(self, driver):
+    def __call__(self, driver: WebDriver) -> Optional[Window]:
         if self.orig_windows is None:
             self.orig_windows = set(driver.window_handles)
             if self.action:
@@ -48,11 +51,11 @@ class window_closed(object):
     be initialized with a zero-argument callback that, when invoked, performs
     the action that would close a window.
     """
-    def __init__(self, action=None):
+    def __init__(self, action: Optional[Callable[[], Any]] = None):
         self.action = action
         self.orig_windows = None
 
-    def __call__(self, driver):
+    def __call__(self, driver: WebDriver) -> Optional[Window]:
         if self.orig_windows is None:
             self.orig_windows = driver.window_handles
             if self.action:

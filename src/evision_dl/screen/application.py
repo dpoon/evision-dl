@@ -25,7 +25,7 @@ from ..xpath import string_literal as xpath_string
 
 class ApplicationScreen(Screen):
     @retry(TimeoutException)
-    def activate_tab(self, tab_label):
+    def activate_tab(self, tab_label:str):
         li_xpath = '//li[@role="tab"][@title={}]'.format(xpath_string(tab_label))
         self.click((By.XPATH, li_xpath + '/a'))
         WebDriverWait(self.driver, 30).until(
