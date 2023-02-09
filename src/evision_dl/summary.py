@@ -15,7 +15,8 @@
 # evision-dl. If not, see <https://www.gnu.org/licenses/>.
 
 import logging
-from typing import Any, List, Tuple, Union
+from logging.handlers import MemoryHandler
+from typing import Any, List, Optional, Tuple, Union
 
 from .applicant import Applicant, ApplicantContextChangeEvent
 from .download import (
@@ -31,7 +32,8 @@ from .robot import Robot, RobotFinishingEvent
 logger = logging.getLogger(__name__)
 
 class Summarizer(EventListener):
-    def __init__(self):
+    def __init__(self, debug_log_replay_handler: Optional[MemoryHandler] = None):
+        self.debug_log_replay_handler = debug_log_replay_handler
         self.current_applicant = None
         self.successes: List[Tuple[Any, PDFDownloadSuccessEvent]] = []
         self.caveats: List[Tuple[Any, PDFGenerationCaveatEvent]] = []
@@ -39,6 +41,7 @@ class Summarizer(EventListener):
 
     def handle_event(self, robot:Robot, event:Event) -> None:
         if isinstance(event, ApplicantContextChangeEvent):
+            self.discard_debug_log()
             self.current_applicant = event.applicant
         elif isinstance(event, PDFGenerationCaveatEvent):
             self.caveats.append((self.current_applicant, event))
@@ -49,12 +52,15 @@ class Summarizer(EventListener):
         elif isinstance(event, PDFDownloadSuccessEvent):
             self.successes.append((self.current_applicant, event))
         elif isinstance(event, RobotFinishingEvent):
-            # If we are crashing with an exception while there is a current
-            # applicant context that hasn't been cleared yet, we should count
-            # the current applicant as a failure.
-            if event.exception and self.current_applicant:
-                self.failures.append((self.current_applicant, PDFFailureEvent("crashed")))
+            if event.exception:
+                self.emit_debug_log()
+                # If we are crashing with an exception while there is a current
+                # applicant context that hasn't been cleared yet, we should count
+                # the current applicant as a failure.
+                if self.current_applicant:
+                    self.failures.append((self.current_applicant, PDFFailureEvent("crashed")))
             self.output_summary()
+            self.discard_debug_log(impending_shutdown=True)
 
     def output_summary(self) -> None:
         logger.info("Downloaded {} PDFs successfully and {} unsuccessfully".format(
@@ -67,4 +73,33 @@ class Summarizer(EventListener):
         if self.failures:
             logger.error("Recap of failures:")
             for applicant, event in self.failures:
-                logger.error("{} ({})".format(applicant))
+                logger.error("{}".format(applicant))
+
+    def discard_debug_log(self, impending_shutdown: bool = False) -> None:
+        if self.debug_log_replay_handler:
+            blackhole = logging.NullHandler()
+            orig_target = self.debug_log_replay_handler.target
+            self.debug_log_replay_handler.setTarget(blackhole)
+            self.debug_log_replay_handler.flush()
+            self.debug_log_replay_handler.setTarget(orig_target)
+
+            # Pessimistically log this text, which might get emitted as an
+            # explanatory header of an instant replay
+            if not impending_shutdown:
+                logger.debug(
+                    '\n' +
+                    '#' * 72 + '\n' +
+                    "We encountered a problem!\n"
+                    "Begin instant replay of recent log messages in detail\n" +
+                    'v' * 72
+                )
+
+    def emit_debug_log(self) -> None:
+        if self.debug_log_replay_handler:
+            logger.debug(
+                '\n' +
+                '^' * 72 + '\n' +
+                "End instant replay of log messages\n" +
+                '#' * 72
+            )
+            self.debug_log_replay_handler.flush()

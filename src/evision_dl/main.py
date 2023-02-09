@@ -23,6 +23,7 @@ Launch a Firefox browser to download PDFs from eVision.
 import argparse
 import logging
 import logging.config
+import logging.handlers
 import os
 import sys
 from typing import Any, Dict, Sequence
@@ -68,14 +69,29 @@ def main(*argv:str) -> int:
     colorama.init()
     if log_config := args.pop('log_config'):
         logging.config.fileConfig(log_config)
+        debug_log_replay_handler = None
     else:
-        ch = logging.StreamHandler()
-        ch.setFormatter(ColorFormatter(
-            fmt="%(asctime)s [%(levelname)s] @%(name)s %(message)s",
-        ))
+        formatter = ColorFormatter(
+            style='{',
+            fmt="{asctime}s [{levelname}] @{name} {message:.1200}",
+        )
+
+        normal_log_handler = logging.StreamHandler()
+        normal_log_handler.setLevel(logging.INFO)
+        normal_log_handler.setFormatter(formatter)
+
+        debug_log_replay_handler = logging.handlers.MemoryHandler(
+            capacity=4096,
+            flushLevel=2*logging.CRITICAL,
+            target=normal_log_handler,
+            flushOnClose=False,
+        )
+        debug_log_replay_handler.setLevel(logging.DEBUG)
+        debug_log_replay_handler.setFormatter(formatter)
+
         logging.basicConfig(
-            level=logging.INFO,
-            handlers=[ch],
+            level=logging.DEBUG,
+            handlers=[normal_log_handler, debug_log_replay_handler],
         )
  
     capabilities = webdriver.DesiredCapabilities().FIREFOX.copy()
@@ -93,7 +109,7 @@ def main(*argv:str) -> int:
     robot = Robot(driver)
     robot.add_event_listener(ApplicantContextChangeListener())
     robot.add_event_listener(Downloader(args['dest_dir']))
-    robot.add_event_listener(Summarizer())
+    robot.add_event_listener(Summarizer(debug_log_replay_handler))
     return robot.run(StartScreen)
 
 if __name__ == '__main__':
