@@ -71,7 +71,7 @@ def main(*argv:str) -> int:
     else:
         ch = logging.StreamHandler()
         ch.setFormatter(ColorFormatter(
-            format="%(asctime)s [%(levelname)s] @%(name)s %(message)s",
+            fmt="%(asctime)s [%(levelname)s] @%(name)s %(message)s",
         ))
         logging.basicConfig(
             level=logging.INFO,

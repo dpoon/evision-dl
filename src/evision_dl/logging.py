@@ -14,26 +14,39 @@
 # You should have received a copy of the GNU General Public License along with
 # evision-dl. If not, see <https://www.gnu.org/licenses/>.
 
-import logging
+from logging import (
+    DEBUG,
+    INFO,
+    WARNING,
+    ERROR,
+    CRITICAL,
+    Formatter,
+    LogRecord,
+)
+from typing import Sequence, Tuple
 
-# https://stackoverflow.com/a/56944256
-grey = "\x1b[38;20m"
-yellow = "\x1b[33;20m"
-red = "\x1b[31;20m"
-bold_red = "\x1b[31;1m"
-reset = "\x1b[0m"
+import colorama
 
-class ColorFormatter(logging.Formatter):
-    def __init__(self, format:str="%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"):
-        self.FORMATS = {
-            logging.DEBUG: grey + format + reset,
-            logging.INFO: grey + format + reset,
-            logging.WARNING: yellow + format + reset,
-            logging.ERROR: red + format + reset,
-            logging.CRITICAL: bold_red + format + reset,
-        }
+DEFAULT_LEVEL_COLORS = (
+    (DEBUG, ''),
+    (INFO, colorama.Fore.WHITE),
+    (WARNING, colorama.Fore.YELLOW),
+    (ERROR, colorama.Fore.RED),
+    (CRITICAL, colorama.Fore.LIGHTRED_EX),
+)
 
-    def format(self, record:logging.LogRecord) -> str:
-        log_fmt = self.FORMATS.get(record.levelno)
-        formatter = logging.Formatter(log_fmt)
+DEFAULT_FMT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)'
+
+class ColorFormatter(Formatter):
+    def __init__(self, fmt: str = DEFAULT_FMT, level_colors: Sequence[Tuple[int, str]] = DEFAULT_LEVEL_COLORS, **kwargs):
+        self._formats = [
+            (level, Formatter(color + fmt + colorama.Style.RESET_ALL, **kwargs))
+            for level, color in sorted(level_colors)
+        ]
+
+    def format(self, record: LogRecord) -> str:
+        formatter = next(
+            formatter for levelno, formatter in self._formats
+            if levelno >= record.levelno
+        )
         return formatter.format(record)
